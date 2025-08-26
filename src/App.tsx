@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/indent */
+/* eslint-disable jsx-a11y/label-has-associated-control */
 /* eslint-disable max-len */
 /* eslint-disable jsx-a11y/control-has-associated-label */
 import React, { useEffect, useRef, useState } from 'react';
@@ -146,19 +148,27 @@ export const App: React.FC = () => {
 
     setDeletingTodoIds(prev => [...prev, ...completedIds]);
 
-    completedIds.map(id =>
-      client
-        .delete(`/todos/${id}`)
-        .then(() => {
-          setTodos(prev => prev.filter(todo => todo.id !== id));
-        })
-        .catch(() => {
-          setErrorMessage('DELETE_TODO');
-        })
-        .finally(() => {
-          setDeletingTodoIds(prev => prev.filter(todoId => todoId !== id));
-        }),
-    );
+    Promise.allSettled(
+      completedIds.map(id => client.delete(`/todos/${id}`).then(() => id)),
+    ).then(results => {
+      const successfulIds = results
+        .filter(result => result.status === 'fulfilled')
+        .map(result => result.value);
+
+      const failedIds = results
+        .filter(result => result.status === 'rejected')
+        .map((_, index) => completedIds[index]);
+
+      setTodos(prev => prev.filter(todo => !successfulIds.includes(todo.id)));
+
+      if (failedIds.length > 0) {
+        setErrorMessage('DELETE_TODO');
+      }
+
+      setDeletingTodoIds(prev =>
+        prev.filter(todoId => !completedIds.includes(todoId)),
+      );
+    });
   };
 
   return (
